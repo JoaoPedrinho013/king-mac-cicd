@@ -2,7 +2,7 @@ import json
 import os
 from unittest import mock
 
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, override_settings
 
 from .menu import CATEGORIES, PAYMENT_METHODS, PRODUCTS, build_menu
 
@@ -38,6 +38,12 @@ class MenuDataTests(SimpleTestCase):
         self.assertGreaterEqual(menu["delivery_fee"], 0)
 
 
+@override_settings(
+    STORAGES={
+        "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+        "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+    }
+)
 class ViewTests(SimpleTestCase):
     def test_home_renders_brand_and_embeds_menu(self):
         response = self.client.get("/")
