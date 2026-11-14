@@ -1,0 +1,14 @@
+[tool.ruff]
+line-length = 120
+extend-exclude = [".venv", "staticfiles"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "B"]
+
+[tool.coverage.run]
+source = ["cardapio", "config"]
+omit = ["*/tests.py", "config/wsgi.py"]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true

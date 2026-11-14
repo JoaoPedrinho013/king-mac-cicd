@@ -1,0 +1,151 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  SECRET_KEY: ci-only-not-a-secret
+  PYTHON_VERSION: "3.13"
+
+jobs:
+  build:
+    name: Build (instalação)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements*.txt
+      - run: pip install -r requirements-dev.txt
+      - run: python manage.py check
+
+  lint:
+    name: Lint (ruff)
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements*.txt
+      - run: pip install -r requirements-dev.txt
+      - run: ruff check .
+
+  test:
+    name: Testes unitários
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements*.txt
+      - run: pip install -r requirements-dev.txt
+      - run: python manage.py test -v 2
+
+  coverage:
+    name: Cobertura (mínimo 80%)
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements*.txt
+      - run: pip install -r requirements-dev.txt
+      - run: coverage run manage.py test
+      - run: coverage report --fail-under=80
+      - run: coverage xml
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml
+          path: coverage.xml
+
+  security:
+    name: Vulnerabilidades (pip-audit + Trivy)
+    needs: coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: pip install pip-audit
+      - name: Auditar dependências Python
+        run: pip-audit -r requirements.txt
+      - name: Construir imagem para o scan (sem publicar)
+        run: docker build -t scan-image:ci .
+      - name: Scan da imagem com Trivy
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: scan-image:ci
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+
+  docker:
+    name: Imagem Docker (Docker Hub)
+    env:
+      IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/django-cicd
+    needs: security
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          build-args: APP_VERSION=${{ github.sha }}
+          tags: |
+            ${{ env.IMAGE_NAME }}:${{ github.sha }}
+            ${{ env.IMAGE_NAME }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy em produção (SSH)
+    needs: docker
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/django-cicd
+    steps:
+      - name: Atualizar container no servidor
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          IMAGE: ${{ env.IMAGE_NAME }}:${{ github.sha }}
+          APP_SECRET_KEY: ${{ secrets.APP_SECRET_KEY }}
+          APP_ALLOWED_HOSTS: ${{ secrets.SSH_HOST }}
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          envs: IMAGE,APP_SECRET_KEY,APP_ALLOWED_HOSTS
+          script: |
+            set -e
+            docker pull "$IMAGE"
+            docker rm -f django-cicd 2>/dev/null || true
+            docker run -d --name django-cicd --restart unless-stopped \
+              -p 80:8000 \
+              -e SECRET_KEY="$APP_SECRET_KEY" \
+              -e ALLOWED_HOSTS="$APP_ALLOWED_HOSTS" \
+              "$IMAGE"
+            docker image prune -f

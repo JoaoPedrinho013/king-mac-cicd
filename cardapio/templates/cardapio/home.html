@@ -1,0 +1,73 @@
+{% load static %}<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>King Mac | Cardápio digital</title>
+  <meta name="description" content="Cardápio digital da King Mac: hambúrgueres, combos, batatas, sobremesas, bebidas e cervejas.">
+  <link rel="stylesheet" href="{% static 'cardapio/style.css' %}">
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap bar">
+      <a class="brand" href="#topo"><span class="crown">👑</span> King Mac</a>
+      <div class="actions">
+        <button class="chip" id="btn-account" type="button">Entrar</button>
+        <button class="chip cart-btn" id="btn-cart" type="button">🛒 <span id="cart-count">0</span></button>
+      </div>
+    </div>
+    <nav class="tabs wrap" id="tabs" aria-label="Categorias"></nav>
+  </header>
+
+  <main id="topo">
+    <section class="hero">
+      <div class="wrap">
+        <p class="kicker">Cardápio digital</p>
+        <h1>Fome de rei?</h1>
+        <p class="lead">Monte seu pedido, escolha como pagar e acompanhe tudo por aqui.</p>
+        <p class="note">Ambiente de demonstração: todos os dados são simulados.</p>
+      </div>
+    </section>
+
+    <div class="wrap" id="menu"></div>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap">
+      <p>King Mac · Cardápio de demonstração · Nenhum pedido é realmente preparado ou entregue.</p>
+      <p>Venda de bebidas alcoólicas proibida para menores de 18 anos.</p>
+      <p><button class="btn ghost" id="btn-wipe" type="button">Limpar meus dados</button></p>
+      <p><a href="{% url 'health' %}">/health/</a> · <a href="{% url 'menu_api' %}">/api/menu/</a></p>
+    </div>
+  </footer>
+
+  <!-- Carrinho -->
+  <dialog id="dlg-cart" class="drawer">
+    <form method="dialog" class="dlg-head"><h2>Seu pedido</h2><button class="x" aria-label="Fechar">✕</button></form>
+    <div id="cart-body" class="dlg-body"></div>
+  </dialog>
+
+  <!-- Conta -->
+  <dialog id="dlg-account" class="modal">
+    <form method="dialog" class="dlg-head"><h2 id="account-title">Entrar</h2><button class="x" aria-label="Fechar">✕</button></form>
+    <div id="account-body" class="dlg-body"></div>
+  </dialog>
+
+  <!-- Checkout -->
+  <dialog id="dlg-checkout" class="modal">
+    <form method="dialog" class="dlg-head"><h2>Finalizar pedido</h2><button class="x" aria-label="Fechar">✕</button></form>
+    <div id="checkout-body" class="dlg-body"></div>
+  </dialog>
+
+  <!-- Resultado -->
+  <dialog id="dlg-done" class="modal">
+    <div id="done-body" class="dlg-body"></div>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  {{ menu|json_script:"menu-data" }}
+  <script src="{% static 'cardapio/app.js' %}" defer></script>
+</body>
+</html>
