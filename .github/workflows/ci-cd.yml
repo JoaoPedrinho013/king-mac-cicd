@@ -87,7 +87,7 @@ jobs:
       - name: Construir imagem para o scan (sem publicar)
         run: docker build -t scan-image:ci .
       - name: Scan da imagem com Trivy
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: scan-image:ci
           severity: CRITICAL,HIGH
@@ -129,7 +129,7 @@ jobs:
       IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/django-cicd
     steps:
       - name: Atualizar container no servidor
-        uses: appleboy/ssh-action@v1.2.0
+        uses: appleboy/ssh-action@v1.2.5
         env:
           IMAGE: ${{ env.IMAGE_NAME }}:${{ github.sha }}
           APP_SECRET_KEY: ${{ secrets.APP_SECRET_KEY }}
