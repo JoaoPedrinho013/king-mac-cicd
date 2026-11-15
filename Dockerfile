@@ -14,6 +14,14 @@ ENV APP_VERSION=$APP_VERSION
 RUN useradd --system --create-home --uid 10001 app
 WORKDIR /app
 COPY --from=builder /opt/venv /opt/venv
+# Segurança: atualiza o zlib e remove pip/setuptools (não são usados em produção e trazem libs embutidas com CVEs)
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends --only-upgrade zlib1g \
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -rf /usr/local/lib/python3.13/site-packages/pip* /usr/local/lib/python3.13/site-packages/setuptools* \
+       /usr/local/lib/python3.13/site-packages/wheel* /usr/local/lib/python3.13/site-packages/pkg_resources \
+       /usr/local/lib/python3.13/site-packages/_distutils_hack /opt/venv/lib/python3.13/site-packages/pip* \
+       /usr/local/bin/pip*
 COPY --chown=app:app . .
 # collectstatic precisa de uma SECRET_KEY apenas durante o build (valor descartável)
 RUN SECRET_KEY=build-only python manage.py collectstatic --noinput && chown -R app:app /app/staticfiles
